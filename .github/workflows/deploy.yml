@@ -14,6 +14,15 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Validate AWS Credentials
+      env:
+        AWS_REGION: us-east-1
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      run: |
+        echo "Validating AWS Credentials..."
+        aws sts get-caller-identity --region $AWS_REGION
+
     - name: Login to AWS ECR
       env:
         AWS_REGION: us-east-1
@@ -21,6 +30,7 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       run: |
+        echo "Logging into AWS ECR..."
         aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
     - name: Build and Push Docker Image
@@ -29,6 +39,7 @@ jobs:
         AWS_REGION: us-east-1
         ECR_REPO_NAME: myapp-repo
       run: |
+        echo "Building and Pushing Docker Image..."
         docker build -t myapp:latest .
         docker tag myapp:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:latest
         docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:latest
