@@ -42,7 +42,7 @@ jobs:
       # Step 5: Build and Push Application Image
       - name: Build and Push Application Image
         env:
-          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com/myapp-repo
+          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com
           ECR_REPOSITORY: myapp-repo
           IMAGE_TAG: app-v0.1
         run: |
@@ -59,7 +59,7 @@ jobs:
       # Step 6: Build and Push MySQL Image
       - name: Build and Push MySQL Image
         env:
-          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com/mysql-repo
+          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com
           ECR_REPOSITORY: mysql-repo
           IMAGE_TAG: mysql-v0.1
         run: |
