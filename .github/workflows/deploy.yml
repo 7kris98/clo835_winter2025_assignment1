@@ -1,0 +1,35 @@
+name: Deploy to AWS ECR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Configure AWS Credentials (Using Cloud9's Role)
+      run: |
+        mkdir -p ~/.aws
+        echo "[default]" > ~/.aws/config
+        echo "region = us-east-1" >> ~/.aws/config
+        echo "[default]" > ~/.aws/credentials
+        echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
+        echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
+
+    - name: Login to AWS ECR
+      run: |
+        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 069408709901.dkr.ecr.us-east-1.amazonaws.com
+
+    - name: Build and Push Docker Image
+      run: |
+        docker build -t myapp:latest .
+        docker tag myapp:latest 069408709901.dkr.ecr.us-east-1.amazonaws.com/myapp-repo:latest
+        docker push 069408709901.dkr.ecr.us-east-1.amazonaws.com/myapp-repo:latest
+
