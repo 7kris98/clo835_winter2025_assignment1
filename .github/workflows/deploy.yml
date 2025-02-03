@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Manually Set AWS Credentials (Avoid using configure-aws-credentials)
+      # Step 2: Manually Set AWS Credentials (Avoid IAM Role Issues)
       - name: Set AWS Credentials
         run: |
           echo "Setting AWS credentials..."
@@ -25,12 +25,17 @@ jobs:
 
       # Step 3: Debug AWS Identity
       - name: Debug AWS Credentials
-        run: aws sts get-caller-identity || echo "Invalid AWS credentials"
+        run: |
+          echo "Checking AWS credentials..."
+          aws sts get-caller-identity || echo "Invalid AWS credentials"
 
       # Step 4: Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         run: |
+          echo "Logging into Amazon ECR..."
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 069408709901.dkr.ecr.us-east-1.amazonaws.com
 
       # Step 5: Build and Push Application Image
@@ -40,9 +45,12 @@ jobs:
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: app-v0.1
         run: |
-          echo "Building application Docker image..."
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
-          echo "Pushing application Docker image to ECR..."
+          
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       # Step 6: Build and Push MySQL Image
@@ -52,7 +60,10 @@ jobs:
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: mysql-v0.1
         run: |
-          echo "Building MySQL Docker image..."
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile_mysql .
-          echo "Pushing MySQL Docker image to ECR..."
+          
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
