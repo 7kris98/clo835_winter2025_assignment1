@@ -22,11 +22,13 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+          role-skip-session-tagging: true # Prevents STS errors
 
       # Step 3: Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         run: |
+          echo "Logging into Amazon ECR..."
           aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 069408709901.dkr.ecr.us-east-1.amazonaws.com
 
       # Step 4: Build and Push Application Image
@@ -36,7 +38,10 @@ jobs:
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: app-v0.1
         run: |
+          echo "Building application Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
+          
+          echo "Pushing application Docker image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       # Step 5: Build and Push MySQL Image
@@ -46,5 +51,8 @@ jobs:
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: mysql-v0.1
         run: |
+          echo "Building MySQL Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile_mysql .
+          
+          echo "Pushing MySQL Docker image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
