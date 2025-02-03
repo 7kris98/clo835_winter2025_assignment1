@@ -1,9 +1,9 @@
-name: Deploy images to ECR
+name: Deploy to ECR
 
 on:
   push:
     branches:
-      - main  
+      - main  # Runs only when merging into main
 
 jobs:
   build:
@@ -15,31 +15,43 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      # Step 2: Log in to Amazon ECR
+      # Step 2: Configure AWS Credentials
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Step 3: Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-          AWS_REGION: us-east-1
+        run: |
+          echo "Logging into Amazon ECR..."
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 069408709901.dkr.ecr.us-east-1.amazonaws.com
 
-      # Step 3: Build and Push Application Image
+      # Step 4: Build and Push Application Image
       - name: Build and Push Application Image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: app-v0.1
         run: |
+          echo "Building application Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
+          
+          echo "Pushing application Docker image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-      # Step 4: Build and Push MySQL Image
+
+      # Step 5: Build and Push MySQL Image
       - name: Build and Push MySQL Image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REGISTRY: 069408709901.dkr.ecr.us-east-1.amazonaws.com
           ECR_REPOSITORY: clo835-assignment1
           IMAGE_TAG: mysql-v0.1
         run: |
+          echo "Building MySQL Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile_mysql .
+          
+          echo "Pushing MySQL Docker image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
