@@ -1,32 +1,44 @@
 from flask import Flask, render_template, request
 from pymysql import connections
 import os
-import random
-import argparse
-
+import time
+import sys
 
 app = Flask(__name__)
 
-DBHOST = os.environ.get("DBHOST") or "localhost"
-DBUSER = os.environ.get("DBUSER") or "root"
-DBPWD = os.environ.get("DBPWD") or "passwors"
-DATABASE = os.environ.get("DATABASE") or "employees"
-COLOR_FROM_ENV = os.environ.get('APP_COLOR') or "lime"
-DBPORT = int(os.environ.get("DBPORT"))
+# Fetch environment variables for the webapp
+DBHOST = os.environ.get("DBHOST", "mysql-container")
+DBUSER = os.environ.get("DBUSER", "root")
+DBPWD = os.environ.get("DBPWD", "pw")
+DATABASE = os.environ.get("DATABASE", "employees")
+DBPORT = int(os.environ.get("DBPORT", 3306))  # Default to 3306 if not set
 
-# Create a connection to the MySQL database
-db_conn = connections.Connection(
-    host= DBHOST,
-    port=DBPORT,
-    user= DBUSER,
-    password= DBPWD, 
-    db= DATABASE
-    
-)
-output = {}
-table = 'employee';
+print(f"🛠️  Connecting to MySQL: {DBHOST}:{DBPORT} with user {DBUSER}")
 
-# Define the supported color codes
+# Retry logic for MySQL connection
+MAX_RETRIES = 5
+RETRY_DELAY = 5  # Seconds
+db_conn = None
+
+for attempt in range(MAX_RETRIES):
+    try:
+        db_conn = connections.Connection(
+            host=DBHOST,
+            port=DBPORT,
+            user=DBUSER,
+            password=DBPWD,
+            db=DATABASE
+        )
+        print("Successfully connected to MySQL")
+        break
+    except Exception as e:
+        print(f" MySQL Connection attempt {attempt + 1} failed: {e}")
+        time.sleep(RETRY_DELAY)
+else:
+    print(" MySQL connection failed after multiple retries. Exiting.")
+    sys.exit(1)
+
+# Define supported color codes for the app
 color_codes = {
     "red": "#e74c3c",
     "green": "#16a085",
@@ -37,100 +49,83 @@ color_codes = {
     "lime": "#C1FF9C",
 }
 
+# Default color from environment variable
+COLOR = os.environ.get('APP_COLOR', "lime")
+if COLOR not in color_codes:  
+    print(f" Invalid APP_COLOR: {COLOR}. Defaulting to 'lime'.")
+    COLOR = "lime"
 
-# Create a string of supported colors
-SUPPORTED_COLORS = ",".join(color_codes.keys())
-
-# Generate a random color
-COLOR = random.choice(["red", "green", "blue", "blue2", "darkblue", "pink", "lime"])
-
-
-@app.route("/", methods=['GET', 'POST'])
+@app.route("/", methods=['GET'])
 def home():
     return render_template('addemp.html', color=color_codes[COLOR])
 
-@app.route("/about", methods=['GET','POST'])
+@app.route("/about", methods=['GET'])
 def about():
     return render_template('about.html', color=color_codes[COLOR])
     
 @app.route("/addemp", methods=['POST'])
 def AddEmp():
-    emp_id = request.form['emp_id']
-    first_name = request.form['first_name']
-    last_name = request.form['last_name']
-    primary_skill = request.form['primary_skill']
-    location = request.form['location']
+    emp_id = request.form.get('emp_id')
+    first_name = request.form.get('first_name')
+    last_name = request.form.get('last_name')
+    primary_skill = request.form.get('primary_skill')
+    location = request.form.get('location')
 
-  
-    insert_sql = "INSERT INTO employee VALUES (%s, %s, %s, %s, %s)"
-    cursor = db_conn.cursor()
-
+    insert_sql = "INSERT INTO employee (emp_id, first_name, last_name, primary_skill, location) VALUES (%s, %s, %s, %s, %s)"
+    
     try:
-        
-        cursor.execute(insert_sql,(emp_id, first_name, last_name, primary_skill, location))
-        db_conn.commit()
-        emp_name = "" + first_name + " " + last_name
+        with db_conn.cursor() as cursor:
+            cursor.execute(insert_sql, (emp_id, first_name, last_name, primary_skill, location))
+            db_conn.commit()
+        emp_name = f"{first_name} {last_name}"
+        print(f"employee {emp_name} added successfully")
+    except Exception as e:
+        print(f"error inserting employee: {e}")
+        db_conn.rollback()
+        emp_name = "Error"
 
-    finally:
-        cursor.close()
-
-    print("all modification done...")
     return render_template('addempoutput.html', name=emp_name, color=color_codes[COLOR])
 
-@app.route("/getemp", methods=['GET', 'POST'])
+@app.route("/getemp", methods=['GET'])
 def GetEmp():
     return render_template("getemp.html", color=color_codes[COLOR])
 
-
-@app.route("/fetchdata", methods=['GET','POST'])
+@app.route("/fetchdata", methods=['POST'])
 def FetchData():
-    emp_id = request.form['emp_id']
+    emp_id = request.form.get('emp_id')
 
-    output = {}
-    select_sql = "SELECT emp_id, first_name, last_name, primary_skill, location from employee where emp_id=%s"
-    cursor = db_conn.cursor()
+    if not emp_id:
+        print(" No Employee ID provided")
+        return render_template("getempoutput.html", id="N/A", fname="N/A",
+                               lname="N/A", interest="N/A", location="N/A", color=color_codes[COLOR])
+
+    select_sql = "SELECT emp_id, first_name, last_name, primary_skill, location FROM employee WHERE emp_id=%s"
 
     try:
-        cursor.execute(select_sql,(emp_id))
-        result = cursor.fetchone()
-        
-        # Add No Employee found form
-        output["emp_id"] = result[0]
-        output["first_name"] = result[1]
-        output["last_name"] = result[2]
-        output["primary_skills"] = result[3]
-        output["location"] = result[4]
-        
+        with db_conn.cursor() as cursor:
+            cursor.execute(select_sql, (emp_id,))
+            result = cursor.fetchone()
+
+        if not result:
+            print(" Employee not found")
+            return render_template("getempoutput.html", id="N/A", fname="N/A",
+                                   lname="N/A", interest="N/A", location="N/A", color=color_codes[COLOR])
+
+        output = {
+            "emp_id": result[0],
+            "first_name": result[1],
+            "last_name": result[2],
+            "primary_skills": result[3],
+            "location": result[4],
+        }
+
+        return render_template("getempoutput.html", id=output["emp_id"], fname=output["first_name"],
+                               lname=output["last_name"], interest=output["primary_skills"], location=output["location"], color=color_codes[COLOR])
+
     except Exception as e:
-        print(e)
+        print(f"Error fetching employee: {e}")
 
-    finally:
-        cursor.close()
+    return render_template("getempoutput.html", id="N/A", fname="N/A", lname="N/A", interest="N/A", location="N/A", color=color_codes[COLOR])
 
-    return render_template("getempoutput.html", id=output["emp_id"], fname=output["first_name"],
-                           lname=output["last_name"], interest=output["primary_skills"], location=output["location"], color=color_codes[COLOR])
-
-if __name__ == '__main__':
-    
-    # Check for Command Line Parameters for color
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--color', required=False)
-    args = parser.parse_args()
-
-    if args.color:
-        print("Color from command line argument =" + args.color)
-        COLOR = args.color
-        if COLOR_FROM_ENV:
-            print("A color was set through environment variable -" + COLOR_FROM_ENV + ". However, color from command line argument takes precendence.")
-    elif COLOR_FROM_ENV:
-        print("No Command line argument. Color from environment variable =" + COLOR_FROM_ENV)
-        COLOR = COLOR_FROM_ENV
-    else:
-        print("No command line argument or environment variable. Picking a Random Color =" + COLOR)
-
-    # Check if input color is a supported one
-    if COLOR not in color_codes:
-        print("Color not supported. Received '" + COLOR + "' expected one of " + SUPPORTED_COLORS)
-        exit(1)
-
-    app.run(host='0.0.0.0',port=8080,debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080, debug=True)
