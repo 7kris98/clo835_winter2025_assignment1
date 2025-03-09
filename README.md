@@ -4,7 +4,7 @@ sudo apt-get update -y
 sudo apt-get install mysql-client -y
 ```
 
-# Running application locally
+# ####Running application locally
 ```
 pip3 install -r requirements.txt
 python3 app.py
